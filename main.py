@@ -5,6 +5,7 @@ import sys
 from pysat.solvers import Glucose3
 import os
 #-----------------------file----------------------------
+pygame.init()
 filename = os.getcwd()
 wall = pygame.image.load(filename + "/PICTURE/wall.png")
 hero1 = pygame.image.load(filename + "/PICTURE/hero1.png")
@@ -12,12 +13,21 @@ hero2 = pygame.image.load(filename + "/PICTURE/hero2.png")
 hero3 = pygame.image.load(filename + "/PICTURE/hero3.png")
 hero4 = pygame.image.load(filename + "/PICTURE/hero4.png")
 image_background = pygame.image.load(filename + "/PICTURE/background.jpg")
+font = pygame.font.Font('freesansbold.ttf', 6)
+font1 = pygame.font.Font('freesansbold.ttf', 32)
+B = font.render('B', True, (0, 0, 139), (176, 224, 230))
+S = font.render('S', True, (0, 0, 0), (232, 232, 232))
+C = font.render('C', True, (178, 34, 34), (255, 181, 197))
+G = font.render('G', True, (255, 130, 71), (255, 211, 155))
+Bleeze = font1.render('B', True, (240, 128, 128))
+Stench = font1.render('S', True, (240, 128, 128))
+Cave = font1.render('C', True, (240, 128, 128))
+Gold = font1.render('G', True, (240, 128, 128))
 #-----------------------data-------------------------------
 
 
 class maze():
     def __init__(self, path):
-        pygame.init()
         self.screen = pygame.display.set_mode((WEIGHT, HEIGHT))
         self.room = []
         self.agent = Agent()
@@ -32,7 +42,7 @@ class maze():
             line = file.readline().split('.')
             temp_array = []
             for a, b in enumerate(line):
-                temp = Room([a + 1, 10 - i], line)
+                temp = Room([a + 1, 10 - i], b)
                 temp_array.append(temp)
             self.room.append(temp_array)
         # random cave
@@ -55,6 +65,12 @@ class maze():
                 check -= 1
         '''
         file.close()
+
+    def test(self):
+        for i in range(self.size):
+            for j in range(self.size):
+                print(self.room[i][j].ID)
+                print(self.room[i][j].feature)
 
     def draw_map(self):
         self.screen.fill(0)
@@ -85,9 +101,29 @@ class maze():
                             self.screen.blit(hero3, (x, y))
                         elif self.agent.direction == 4:
                             self.screen.blit(hero4, (x, y))
+                        temp = 450
+                        for it in self.room[i][j].feature:
+                            if it == 'B':
+                                self.screen.blit(Bleeze, (temp, 50))
+                            elif it == 'C':
+                                self.screen.blit(Cave, (temp, 50))
+                            elif it == 'S':
+                                self.screen.blit(Stench, (temp, 50))
+                            elif it == 'G':
+                                self.screen.blit(Gold, (temp, 50))
+                            temp += 40
                     else:
-                        pass
-                        # print stench bleeze
+                        temp = y
+                        for it in self.room[i][j].feature:
+                            if it == 'B':
+                                self.screen.blit(B, (x + 3, temp))
+                            elif it == 'C':
+                                self.screen.blit(C, (x + 3, temp))
+                            elif it == 'S':
+                                self.screen.blit(S, (x + 3, temp))
+                            elif it == 'G':
+                                self.screen.blit(G, (x + 3, temp))
+                            temp += 7
                 x += 30
             y += 30
 
@@ -146,7 +182,8 @@ class Room():
 HEIGHT = 600
 WEIGHT = 1080
 level_running = False
-while True:
+stop = True
+while stop:
     maze_map = 0
     while not(level_running):
         maze_map = int(input("Enter map (1-5): "))
@@ -154,7 +191,9 @@ while True:
             level_running = True
     main = maze(filename + "/MAP/map" + str(maze_map) + ".txt")
     main.main_amination()
+    # main.test()
     level_running = False
+    #stop = False
     '''
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
