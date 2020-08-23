@@ -4,6 +4,8 @@ import itertools
 import sys
 from pysat.solvers import Glucose3
 import os
+import aima3.utils
+import aima3.logic
 #-----------------------file----------------------------
 pygame.init()
 filename = os.getcwd()
@@ -33,7 +35,26 @@ class maze():
         self.agent = Agent()
         self.arrow = 5
         self.size = 0
+        self.clause = []
         self.read_data(path)
+        self.add_clause()
+        print(self.clause)
+
+    def add_clause(self):
+        self.clause.append(aima3.utils.expr(
+            "Breeze(x) & Adjency(x,y) ==> Pit(y)"))
+        self.clause.append(aima3.utils.expr(
+            "Stench(x) & Adjency(x,y) ==> Wumpus(y)"))
+        self.clause.append(aima3.utils.expr(
+            "Space(x) & Adjency(x,y) ==> ~Wumpus(y)"))
+        '''
+        self.clause.append(aima3.utils.expr("Gold(x) ==> Pick(x)"))
+        self.clause.append(aima3.utils.expr(
+            "Space(x) ==> (Adjency(x,y) ==> Safe(y))"))
+        self.clause.append(aima3.utils.expr(
+            "Safe(x)&~Discover(x) ==> Destination(y)"))
+        '''
+        self.KB = aima3.logic.FolKB(self.clause)
 
     def read_data(self, path):
         file = open(path, "r")
@@ -50,7 +71,7 @@ class maze():
         while check:
             x = np.random.randint(0, 9)
             y = np.random.randint(0, 9)
-            if not self.room[x][y].check_wumpus() and not self.room[x][y].check_pit():
+            if len(self.room[x][y].feature) == 0:
                 self.agent.add_position([y + 1, 10 - x])
                 self.room[x][y].append_feature('C')
                 self.room[x][y].discover = False
