@@ -37,24 +37,28 @@ class maze():
         self.size = 0
         self.clause = []
         self.read_data(path)
-        self.add_clause()
-        print(self.clause)
+        #self.add_clause()
 
     def add_clause(self):
         self.clause.append(aima3.utils.expr(
             "Breeze(x) & Adjency(x,y) ==> Pit(y)"))
+
         self.clause.append(aima3.utils.expr(
             "Stench(x) & Adjency(x,y) ==> Wumpus(y)"))
         self.clause.append(aima3.utils.expr(
-            "Space(x) & Adjency(x,y) ==> ~Wumpus(y)"))
-        '''
-        self.clause.append(aima3.utils.expr("Gold(x) ==> Pick(x)"))
-        self.clause.append(aima3.utils.expr(
-            "Space(x) ==> (Adjency(x,y) ==> Safe(y))"))
-        self.clause.append(aima3.utils.expr(
-            "Safe(x)&~Discover(x) ==> Destination(y)"))
-        '''
+            "Space(x) & Adjency(x,y) ==> Safe(y)"))
         self.KB = aima3.logic.FolKB(self.clause)
+        temp = self.room[10 - self.agent.position[1]
+                         ][self.agent.position[0] - 1].get_adjency()
+        position_agent = self.room[10 - self.agent.position[1]
+                                   ][self.agent.position[0] - 1].number
+        self.KB.tell(aima3.utils.expr("Space(" + str(position_agent) + ")"))
+        for i in temp:
+            self.KB.tell(aima3.utils.expr(
+                "Adjency(" + str(position_agent) + "," + str(i) + ")"))
+            self.KB.tell(aima3.utils.expr(
+                "Adjency(" + str(i) + "," + str(position_agent) + ")"))
+        self.KB.tell(aima3.utils.expr("~Gold(5)"))
 
     def read_data(self, path):
         file = open(path, "r")
@@ -76,6 +80,8 @@ class maze():
                 self.room[x][y].append_feature('C')
                 self.room[x][y].discover = False
                 check = False
+                self.agent.discover.append([y + 1, 10 - x])
+                # self.clause.append(i for i in self.room[x][y].get_adjency())
         '''
         check = 5
         while check > 0:
@@ -157,12 +163,124 @@ class maze():
                     exit()
             pygame.display.update()
 
+    def first_order_logic(self):
+        current_room = self.room[10 - self.agent.position[1]
+                                 ][self.agent.position[0] - 1]
+        temp = current_room.get_adjency()
+        position_agent = current_room.number
+        if len(current_room) == 0:
+            self.KB.tell(aima3.utils.expr(
+                "Space(" + str(position_agent) + ")"))
+        else:
+            if 'S' in current_room.feature:
+                self.KB.tell(aima3.utils.expr(
+                    "Stench(" + str(position_agent) + ")"))
+            if 'B' in current_room.feature:
+                self.KB.tell(aima3.utils.expr(
+                    "Breeze(" + str(position_agent) + ")"))
+            if 'G' in current_room.feature:
+                #pick gold
+                pass
+        for i in temp:
+            self.KB.tell(aima3.utils.expr(
+                "Adjency(" + str(position_agent) + "," + str(i) + ")"))
+            self.KB.tell(aima3.utils.expr(
+                "Adjency(" + str(i) + "," + str(position_agent) + ")"))
+        safe = aima3.logic.fol_bc_ask(self.KB, aima3.utils.expr('Safe(y)'))
+        wumpus = aima3.logic.fol_bc_ask(self.KB, aima3.utils.expr('Wumpus(x)'))
+        safe_list = self.execute_safe_position(list(safe))
+        wumpus_list=None
+        if len(safe_list) == 0:
+            wumpus_list = self.execute_wumpus_position(list(wumpus), list(safe))
+        return safe_list,wumpus_list
+    def execute_wumpus_position(self,array_wumpus,array_safe):
+        wumpus=[]
+        for i in array_wumpus:
+            check=True
+            for j in array_safe:
+                if i['x']==j['y']:
+                    check=False
+                    break
+            if check:
+                wumpus.append([int(i['x'] / 10) + 1, i['x'] % 10])
+        return wumpus
+
+    def execute_safe_position(self, array):
+        destination = []
+        for i in array:
+            if [int(i['y'] / 10) + 1, i['y'] % 10] not in self.agent.discover:
+                destination.append([int(i['y'] / 10) + 1, i['y'] % 10])
+        return destination
+
+    def propositonal_logic(self):
+        g = Glucose3()
+        for it in self.clause:
+            g.add_clause(it)
+        sol = g.solve()
+        if sol:
+            return True, g.get_model()
+        return False, None
+
+    def choose_node(self, result):
+        temp = []
+        for i in result:
+            if i > 0 and not [int(i / 10) + 1, i % 10] in self.agent.discover:
+                temp.append(i)
+        min_cost = 9999
+        frontier = []
+        expand = []
+
+    def BFS(self,goal):
+        return_value = []
+        check_stop = True
+        frontier_parent = []
+        expanded_parent = []
+        frontier.append(self.agent.position)
+        frontier_parent.append(-1)
+        while check_stop:
+            if len(self.frontier) == 0:
+                return_value.append(monster)
+                return_value.append(monster)
+                break
+            self.expanded.append(self.frontier[0])
+            self.frontier = self.frontier[1:]
+            expanded_parent.append(frontier_parent[0])
+            frontier_parent = frontier_parent[1:]
+            adjacency_node = self.ACTION(
+                self.expanded[len(self.expanded) - 1], 3)
+            i=0
+            for a in adjacency_node:
+                for b in action:
+                    if b[0]==a[0] and b[1]==a[1]:
+                        adjacency_node.pop(i)
+                        i-=1
+                i+=1
+            #print("ajd: "+str(adjacency_node))
+            for i in adjacency_node:
+                if not i in self.expanded:
+                    if i[0] == goal[0] and i[1] == goal[1]:
+                        expanded_parent.append(len(self.expanded) - 1)
+                        self.expanded.append(i)
+                        parent_pos = len(self.expanded) - 1
+                        while parent_pos != -1:
+                            return_value.append(self.expanded[parent_pos])
+                            parent_pos = expanded_parent[parent_pos]
+                        return_value = return_value[::-1]
+                        check_stop = False
+                    else:
+                        if not i in self.frontier:
+                            frontier_parent.append(len(self.expanded) - 1)
+                            self.frontier.append(i)
+        self.expanded.clear()
+        self.frontier.clear()
+        return return_value[1]
 
 class Agent():
     def __init__(self):
         self.point = 1000
         self.direction = 1  # 1 : north 2: south 3: East 4: west
-        self.position = []
+        self.position = []  # [1,1]
+        self.discover = []  # [1,1] [2,2]
 
     def add_position(self, position):
         self.position = position
@@ -177,6 +295,7 @@ class Room():
         self.ID = ID
         self.discover = True
         self.add_feature(feature)
+        self.number = (ID[0] - 1) + 10 * ID[1]
 
     def add_feature(self, feature):
         for i in range(len(feature)):
@@ -198,6 +317,28 @@ class Room():
     def append_feature(self, feature):
         self.feature.append(feature)
 
+    def get_adjency(self):
+        temp = []
+        if self.ID[0] - 1 > 0:
+            temp.append(self.number - 10)
+        if self.ID[0] + 1 < 11:
+            temp.append(self.number + 10)
+        if self.ID[1] - 1 > 0:
+            temp.append(self.number - 1)
+        if self.ID[1] + 1 < 11:
+            temp.append(self.number + 1)
+        return temp
+    def get_adjency_position(self):
+        temp = []
+        if self.ID[0] - 1 > 0:
+            temp.append([ID[0]-1,ID[1]])
+        if self.ID[0] + 1 < 11:
+            temp.append([ID[0]+1,ID[1]])
+        if self.ID[1] - 1 > 0:
+            temp.append([ID[0]-1,ID[1]-1])
+        if self.ID[1] + 1 < 11:
+            temp.append([ID[0]-1,ID[1]+1])
+        return temp
 
 #-----------------------screen-----------------------------
 HEIGHT = 600
@@ -214,7 +355,7 @@ while stop:
     main.main_amination()
     # main.test()
     level_running = False
-    #stop = False
+    # stop = False
     '''
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
