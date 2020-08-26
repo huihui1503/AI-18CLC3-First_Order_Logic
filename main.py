@@ -37,7 +37,7 @@ class maze():
         self.size = 0
         self.clause = []
         self.read_data(path)
-        #self.add_clause()
+        # self.add_clause()
 
     def add_clause(self):
         self.clause.append(aima3.utils.expr(
@@ -52,13 +52,6 @@ class maze():
                          ][self.agent.position[0] - 1].get_adjency()
         position_agent = self.room[10 - self.agent.position[1]
                                    ][self.agent.position[0] - 1].number
-        self.KB.tell(aima3.utils.expr("Space(" + str(position_agent) + ")"))
-        for i in temp:
-            self.KB.tell(aima3.utils.expr(
-                "Adjency(" + str(position_agent) + "," + str(i) + ")"))
-            self.KB.tell(aima3.utils.expr(
-                "Adjency(" + str(i) + "," + str(position_agent) + ")"))
-        self.KB.tell(aima3.utils.expr("~Gold(5)"))
 
     def read_data(self, path):
         file = open(path, "r")
@@ -155,8 +148,33 @@ class maze():
             y += 30
 
     def main_amination(self):
+        mode = 1  # 1: Analysize KB, 2: find_path , 3: display movement
+        list_safe = None
+        list_wumpus = None
+        i = 0
+        path = None
         while True:
             self.draw_map()
+            if mode == 1:
+                list_safe, list_wumpus = self.first_order_logic()
+                mode = 2
+            elif mode == 2:
+                if len(safe_list) == 0:
+                    # calculate whether using arrow or back to cave
+                    pass
+                else:
+                    path = self.choose_node(list_safe)
+                    i = 0
+            elif mode == 3:
+                if i < len(path):
+                    self.agent.direction = self.agent(path[i])
+                    self.agent.position = path[i]
+                    i += 1
+                else:
+                    self.agent.discover.append(self.agent.position)
+                    self.room[10 - self.agent.position[1]
+                              ][self.agent.position[0] - 1].discover = False
+                    mode = 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -179,7 +197,7 @@ class maze():
                 self.KB.tell(aima3.utils.expr(
                     "Breeze(" + str(position_agent) + ")"))
             if 'G' in current_room.feature:
-                #pick gold
+                # pick gold
                 pass
         for i in temp:
             self.KB.tell(aima3.utils.expr(
@@ -189,17 +207,19 @@ class maze():
         safe = aima3.logic.fol_bc_ask(self.KB, aima3.utils.expr('Safe(y)'))
         wumpus = aima3.logic.fol_bc_ask(self.KB, aima3.utils.expr('Wumpus(x)'))
         safe_list = self.execute_safe_position(list(safe))
-        wumpus_list=None
+        wumpus_list = None
         if len(safe_list) == 0:
-            wumpus_list = self.execute_wumpus_position(list(wumpus), list(safe))
-        return safe_list,wumpus_list
-    def execute_wumpus_position(self,array_wumpus,array_safe):
-        wumpus=[]
+            wumpus_list = self.execute_wumpus_position(
+                list(wumpus), list(safe))
+        return safe_list, wumpus_list
+
+    def execute_wumpus_position(self, array_wumpus, array_safe):
+        wumpus = []
         for i in array_wumpus:
-            check=True
+            check = True
             for j in array_safe:
-                if i['x']==j['y']:
-                    check=False
+                if i['x'] == j['y']:
+                    check = False
                     break
             if check:
                 wumpus.append([int(i['x'] / 10) + 1, i['x'] % 10])
@@ -221,16 +241,17 @@ class maze():
             return True, g.get_model()
         return False, None
 
-    def choose_node(self, result):
-        temp = []
-        for i in result:
-            if i > 0 and not [int(i / 10) + 1, i % 10] in self.agent.discover:
-                temp.append(i)
+    def choose_node(self, list_safe):
         min_cost = 9999
-        frontier = []
-        expand = []
+        path = None
+        for i in list_safe:
+            temp = self.BFS(i)
+            if len(temp) < min_cost:
+                min_cost = len(temp)
+                path = temp
+        return path
 
-    def BFS(self,goal):
+    def BFS(self, goal):
         return_value = []
         check_stop = True
         frontier_parent = []
@@ -239,41 +260,31 @@ class maze():
         frontier_parent.append(-1)
         while check_stop:
             if len(self.frontier) == 0:
-                return_value.append(monster)
-                return_value.append(monster)
                 break
-            self.expanded.append(self.frontier[0])
-            self.frontier = self.frontier[1:]
+            expanded.append(frontier[0])
+            frontier = frontier[1:]
             expanded_parent.append(frontier_parent[0])
             frontier_parent = frontier_parent[1:]
-            adjacency_node = self.ACTION(
-                self.expanded[len(self.expanded) - 1], 3)
-            i=0
-            for a in adjacency_node:
-                for b in action:
-                    if b[0]==a[0] and b[1]==a[1]:
-                        adjacency_node.pop(i)
-                        i-=1
-                i+=1
-            #print("ajd: "+str(adjacency_node))
+            self.agent.add_position([y + 1, 10 - x])
+            adjacency_node = self.room[10 - frontier[1]
+                                       ][frontier[0] - 1].get_adjency_position()
             for i in adjacency_node:
-                if not i in self.expanded:
+                if not i in expanded and i not in self.agent.discover:
                     if i[0] == goal[0] and i[1] == goal[1]:
-                        expanded_parent.append(len(self.expanded) - 1)
-                        self.expanded.append(i)
-                        parent_pos = len(self.expanded) - 1
+                        expanded_parent.append(len(expanded) - 1)
+                        expanded.append(i)
+                        parent_pos = len(expanded) - 1
                         while parent_pos != -1:
-                            return_value.append(self.expanded[parent_pos])
+                            return_value.append(expanded[parent_pos])
                             parent_pos = expanded_parent[parent_pos]
-                        return_value = return_value[::-1]
+                        return_value = return_value[1:]
                         check_stop = False
                     else:
-                        if not i in self.frontier:
-                            frontier_parent.append(len(self.expanded) - 1)
-                            self.frontier.append(i)
-        self.expanded.clear()
-        self.frontier.clear()
-        return return_value[1]
+                        if not i in frontier:
+                            frontier_parent.append(len(expanded) - 1)
+                            frontier.append(i)
+        return return_value
+
 
 class Agent():
     def __init__(self):
@@ -288,6 +299,16 @@ class Agent():
     def compare_ID(self, ID):
         return self.position[0] == ID[0] and self.position[1] == ID[1]
 
+    def direction(self, position):
+        if position[0] == self.position[0] - 1:
+            return 4
+        if position[0] == self.position[0] + 1:
+            return 3
+        if position[1] == self.position[0] - 1:
+            return 2
+        if position[1] == self.position[0] + 1:
+            return 1
+
 
 class Room():
     def __init__(self, ID, feature):
@@ -295,7 +316,7 @@ class Room():
         self.ID = ID
         self.discover = True
         self.add_feature(feature)
-        self.number = (ID[0] - 1) + 10 * ID[1]
+        self.number = (ID[0] - 1) * 10 + ID[1]
 
     def add_feature(self, feature):
         for i in range(len(feature)):
@@ -328,17 +349,19 @@ class Room():
         if self.ID[1] + 1 < 11:
             temp.append(self.number + 1)
         return temp
+
     def get_adjency_position(self):
         temp = []
         if self.ID[0] - 1 > 0:
-            temp.append([ID[0]-1,ID[1]])
+            temp.append([ID[0] - 1, ID[1]])
         if self.ID[0] + 1 < 11:
-            temp.append([ID[0]+1,ID[1]])
+            temp.append([ID[0] + 1, ID[1]])
         if self.ID[1] - 1 > 0:
-            temp.append([ID[0]-1,ID[1]-1])
+            temp.append([ID[0] - 1, ID[1] - 1])
         if self.ID[1] + 1 < 11:
-            temp.append([ID[0]-1,ID[1]+1])
+            temp.append([ID[0] - 1, ID[1] + 1])
         return temp
+
 
 #-----------------------screen-----------------------------
 HEIGHT = 600
