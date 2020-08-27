@@ -39,6 +39,7 @@ class maze():
         self.cave = None
         self.clause = []
         self.read_data(path)
+        # self.test()
         self.add_clause()
 
     def add_clause(self):
@@ -145,13 +146,13 @@ class maze():
                                 self.screen.blit(S, (x + 3, temp))
                             elif it == 'G':
                                 self.screen.blit(G, (x + 3, temp))
-                            temp += 7
+                            temp += 10
                 x += 30
             y += 30
 
     def main_amination(self):
         mode = 1  # 1: Analysize KB, 2: find_path , 3: display movement
-        list_safe = None
+        list_safe = []
         list_wumpus = None
         i = 0
         path = None
@@ -213,17 +214,22 @@ class maze():
             self.agent.KB.tell(aima3.utils.expr(
                 "Space(" + str(position_agent) + ")"))
         else:
-            if 'S' in current_room.feature:
-                self.agent.KB.tell(aima3.utils.expr(
-                    "Stench(" + str(position_agent) + ")"))
-            if 'B' in current_room.feature:
-                self.agent.KB.tell(aima3.utils.expr(
-                    "Breeze(" + str(position_agent) + ")"))
-            if 'G' in current_room.feature:
-                self.agent.point += 100
-                self.agent.KB.tell(aima3.utils.expr(
-                    "Space(" + str(position_agent) + ")"))
-                current_room.feature.pop(current_room.feature.index('G'))
+            i = 0
+            while i < len(current_room.feature):
+                if current_room.feature[i] == 'S':
+                    self.agent.KB.tell(aima3.utils.expr(
+                        "Stench(" + str(position_agent) + ")"))
+                if current_room.feature[i] == 'B':
+                    self.agent.KB.tell(aima3.utils.expr(
+                        "Breeze(" + str(position_agent) + ")"))
+                if current_room.feature[i] == 'G':
+                    self.agent.point += 100
+                    if len(current_room.feature) == 1:
+                        self.agent.KB.tell(aima3.utils.expr(
+                            "Space(" + str(position_agent) + ")"))
+                    current_room.feature.pop(current_room.feature.index('G'))
+                    i -= 1
+                i += 1
         for i in temp:
             self.agent.KB.tell(aima3.utils.expr(
                 "Adjency(" + str(position_agent) + "," + str(i) + ")"))
@@ -233,7 +239,6 @@ class maze():
             self.agent.KB, aima3.utils.expr('Safe(y)')))
         wumpus = aima3.logic.fol_bc_ask(
             self.agent.KB, aima3.utils.expr('Wumpus(x)'))
-
         safe_list = self.execute_safe_position(safe)
         wumpus_list = None
         if len(safe_list) == 0:
@@ -250,11 +255,13 @@ class maze():
                     check = False
                     break
             if check:
-                value = i[aima3.utils.expr('x')]
-                if value % 10 == 0:
-                    wumpus.append([int(value / 10), 10])
+                if i[aima3.utils.expr('x')] % 10:
+                    value = [int(i[aima3.utils.expr('x')] / 10), 10]
                 else:
-                    wumpus.append([int(value / 10) + 1, value % 10])
+                    value = [int(i[aima3.utils.expr('x')] / 10) +
+                             1, i[aima3.utils.expr('x')] % 10]
+                if value not in wumpus:
+                    wumpus.append(value)
         return wumpus
 
     def execute_safe_position(self, array):
@@ -266,7 +273,7 @@ class maze():
                 compare_value = [int(value / 10), 10]
             else:
                 compare_value = [int(value / 10) + 1, value % 10]
-            if compare_value not in self.agent.discover:
+            if compare_value not in self.agent.discover and compare_value not in destination:
                 # print([int(value / 10) + 1, value % 10])
                 destination.append(compare_value)
         return destination
@@ -318,6 +325,11 @@ class maze():
 
             for i in adjacency_node:
                 if not i in expanded:
+                    temp_value = None
+                    if i % 10 == 0:
+                        temp_value = [int(i / 10), 10]
+                    else:
+                        temp_value = [int(i / 10) + 1, i % 10]
                     if i == ((goal[0] - 1) * 10 + goal[1]):
                         expanded_parent.append(len(expanded) - 1)
                         expanded.append(i)
@@ -325,10 +337,10 @@ class maze():
                         while parent_pos != -1:
                             return_value.append(expanded[parent_pos])
                             parent_pos = expanded_parent[parent_pos]
-                        return_value = return_value[::-1]
+                        return_value = return_value[:: -1]
                         return_value = return_value[1:]
                         check_stop = False
-                    elif [int(i / 10) + 1, i % 10] in self.agent.discover:
+                    elif temp_value in self.agent.discover:
                         if not i in frontier:
                             frontier_parent.append(len(expanded) - 1)
                             frontier.append(i)
