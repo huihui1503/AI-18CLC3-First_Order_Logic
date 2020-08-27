@@ -9,13 +9,14 @@ import aima3.logic
 #-----------------------file----------------------------
 pygame.init()
 filename = os.getcwd()
+clock = pygame.time.Clock()
 wall = pygame.image.load(filename + "/PICTURE/wall.png")
 hero1 = pygame.image.load(filename + "/PICTURE/hero1.png")
 hero2 = pygame.image.load(filename + "/PICTURE/hero2.png")
 hero3 = pygame.image.load(filename + "/PICTURE/hero3.png")
 hero4 = pygame.image.load(filename + "/PICTURE/hero4.png")
 image_background = pygame.image.load(filename + "/PICTURE/background.jpg")
-font = pygame.font.Font('freesansbold.ttf', 6)
+font = pygame.font.Font('freesansbold.ttf', 10)
 font1 = pygame.font.Font('freesansbold.ttf', 32)
 B = font.render('B', True, (0, 0, 139), (176, 224, 230))
 S = font.render('S', True, (0, 0, 0), (232, 232, 232))
@@ -87,8 +88,9 @@ class maze():
     def test(self):
         for i in range(self.size):
             for j in range(self.size):
-                print(self.room[i][j].ID)
-                print(self.room[i][j].feature)
+                print(self.room[i][j].ID, end=' ')
+                print(self.room[i][j].feature, end=' ')
+                print(len(self.room[i][j].feature))
 
     def draw_map(self):
         self.screen.fill(0)
@@ -111,14 +113,16 @@ class maze():
                     self.screen.blit(wall, (x, y))
                 else:
                     if self.agent.compare_ID(self.room[i][j].ID):
+                        surf = None
                         if self.agent.direction == 1:
-                            self.screen.blit(hero1, (x, y))
+                            surf = pygame.transform.rotate(hero1, 0)
                         elif self.agent.direction == 2:
-                            self.screen.blit(hero2, (x, y))
+                            surf = pygame.transform.rotate(hero1, 180)
                         elif self.agent.direction == 3:
-                            self.screen.blit(hero3, (x, y))
-                        elif self.agent.direction == 4:
-                            self.screen.blit(hero4, (x, y))
+                            surf = pygame.transform.rotate(hero1, 90)
+                        else:
+                            surf = pygame.transform.rotate(hero1, -90)
+                        self.screen.blit(surf, (x, y))
                         temp = 450
                         for it in self.room[i][j].feature:
                             if it == 'B':
@@ -152,8 +156,9 @@ class maze():
         i = 0
         path = None
         check_stop = True
+        # self.draw_map()
         while check_stop:
-            self.draw_map()
+            clock.tick(10)
             if mode == 1:
                 list_safe, list_wumpus = self.first_order_logic()
                 mode = 2
@@ -161,41 +166,41 @@ class maze():
                 if len(list_safe) == 0:
                     # calculate whether using arrow or back to cave
                     list_safe.append(self.cave)
-                else:
-                    # print(list_safe)
-                    path = self.choose_node(list_safe)
-                    # print(path)
-                    i = 0
-                    mode = 3
+                path, goal = self.choose_node(list_safe)
+                i = 0
+                mode = 3
             elif mode == 3:
                 if i < len(path):
                     self.agent.set_direction(self.agent.get_direction(path[i]))
                     self.agent.position = path[i]
-                    # print(path[i])
+                    self.agent.point -= 10
                     i += 1
                 else:
-                    self.agent.discover.append(self.agent.position)
-                    self.room[10 - self.agent.position[1]
-                              ][self.agent.position[0] - 1].discover = False
-                    self.agent.discover.append(self.agent.position)
-                    # print(10 - self.agent.position[1])
-                    # print(self.agent.position[0] - 1)
+                    self.agent.discover.append(goal)
+                    self.room[10 - goal[1]][goal[0] - 1].discover = False
                     mode = 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     exit()
-            check_stop = self.terminal(list_safe)
+            self.draw_map()
+            if mode != 3:
+                check_stop = self.terminal(list_safe)
             pygame.display.update()
 
     def terminal(self, list_safe):
         current_room = self.room[10 - self.agent.position[1]
                                  ][self.agent.position[0] - 1]
         if 'P' in current_room.feature:
+            print('P')
+            print(self.agent.position)
             return False
         if 'W' in current_room.feature:
+            print('W')
+            print(self.agent.position)
             return False
         if len(list_safe) == 1 and self.cave in list_safe:
+            print('C')
             return False
         return True
 
@@ -215,8 +220,10 @@ class maze():
                 self.agent.KB.tell(aima3.utils.expr(
                     "Breeze(" + str(position_agent) + ")"))
             if 'G' in current_room.feature:
-                # pick gold
-                pass
+                self.agent.point += 100
+                self.agent.KB.tell(aima3.utils.expr(
+                    "Space(" + str(position_agent) + ")"))
+                current_room.feature.pop(current_room.feature.index('G'))
         for i in temp:
             self.agent.KB.tell(aima3.utils.expr(
                 "Adjency(" + str(position_agent) + "," + str(i) + ")"))
@@ -245,7 +252,7 @@ class maze():
             if check:
                 value = i[aima3.utils.expr('x')]
                 if value % 10 == 0:
-                    wumpus.append([int(value / 10), value % 10 + 1])
+                    wumpus.append([int(value / 10), 10])
                 else:
                     wumpus.append([int(value / 10) + 1, value % 10])
         return wumpus
@@ -256,12 +263,12 @@ class maze():
             value = i[aima3.utils.expr('y')]
             compare_value = None
             if value % 10 == 0:
-                compare_value = [int(value / 10), value % 10 + 1]
+                compare_value = [int(value / 10), 10]
             else:
                 compare_value = [int(value / 10) + 1, value % 10]
             if compare_value not in self.agent.discover:
                 # print([int(value / 10) + 1, value % 10])
-                destination.append([int(value / 10) + 1, value % 10])
+                destination.append(compare_value)
         return destination
 
     def propositonal_logic(self):
@@ -276,13 +283,14 @@ class maze():
     def choose_node(self, list_safe):
         min_cost = 9999
         path = None
+        goal = None
         for i in list_safe:
             temp = self.BFS(i)
-            # print(temp)
             if len(temp) < min_cost:
                 min_cost = len(temp)
                 path = temp
-        return path
+                goal = i
+        return path, goal
 
     def BFS(self, goal):
         return_value = []
@@ -300,15 +308,16 @@ class maze():
             expanded.append(frontier[0])
             expanded_parent.append(frontier_parent[0])
             if frontier[0] % 10 == 0:
-                adjacency_node = self.room[10 - (frontier[0] % 10 + 1)
-                                           ][int(frontier[0] / 10) - 1].get_adjency()
+                adjacency_node = self.room[0][int(
+                    frontier[0] / 10) - 1].get_adjency()
             else:
                 adjacency_node = self.room[10 - (frontier[0] % 10)
                                            ][int(frontier[0] / 10)].get_adjency()
             frontier_parent = frontier_parent[1:]
             frontier = frontier[1:]
+
             for i in adjacency_node:
-                if not i in expanded and [int(i / 10) + 1, i % 10] not in self.agent.discover:
+                if not i in expanded:
                     if i == ((goal[0] - 1) * 10 + goal[1]):
                         expanded_parent.append(len(expanded) - 1)
                         expanded.append(i)
@@ -319,14 +328,14 @@ class maze():
                         return_value = return_value[::-1]
                         return_value = return_value[1:]
                         check_stop = False
-                    else:
+                    elif [int(i / 10) + 1, i % 10] in self.agent.discover:
                         if not i in frontier:
                             frontier_parent.append(len(expanded) - 1)
                             frontier.append(i)
         path = []
         for i in return_value:
             if i % 10 == 0:
-                path.append([int(i / 10), i % 10 + 1])
+                path.append([int(i / 10), 10])
             else:
                 path.append([int(i / 10) + 1, i % 10])
         return path
@@ -347,13 +356,13 @@ class Agent():
         return self.position[0] == ID[0] and self.position[1] == ID[1]
 
     def get_direction(self, position):
-        if position[0] == self.position[0] - 1:
+        if position[0] - 1 == self.position[0]:
             return 4
-        if position[0] == self.position[0] + 1:
+        if position[0] + 1 == self.position[0]:
             return 3
-        if position[1] == self.position[0] - 1:
+        if position[1] - 1 == self.position[0]:
             return 2
-        if position[1] == self.position[0] + 1:
+        if position[1] + 1 == self.position[0]:
             return 1
 
     def set_direction(self, direction):
@@ -370,7 +379,7 @@ class Room():
 
     def add_feature(self, feature):
         for i in range(len(feature)):
-            if feature[i] != '-':
+            if feature[i] != '-' and feature[i] != '\n':
                 self.feature.append(feature[i])
 
     def check_wumpus(self):
@@ -424,10 +433,14 @@ while stop:
         maze_map = int(input("Enter map (1-5): "))
         if maze_map > 0 and maze_map < 6:
             level_running = True
-    main = maze(filename + "/MAP/map" + str(maze_map) + ".txt")
-    main.main_amination()
-    # main.test()
-    level_running = False
+        if maze_map == -1:
+            level_running = True
+            stop = False
+    if stop:
+        main = maze(filename + "/MAP/map" + str(maze_map) + ".txt")
+        main.main_amination()
+        # main.test()
+        level_running = False
     # stop = False
     '''
     for event in pygame.event.get():
