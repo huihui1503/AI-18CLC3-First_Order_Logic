@@ -34,7 +34,6 @@ class maze():
         self.screen = pygame.display.set_mode((WEIGHT, HEIGHT))
         self.room = []
         self.agent = Agent()
-        self.arrow = 5
         self.size = 0
         self.cave = None
         self.clause = []
@@ -182,7 +181,7 @@ class maze():
                     elif action == 22:  # Shoot
                         self.agent.set_direction(
                             self.agent.get_direction(goal))  # Face to wumpus
-                        self.agent.shoot_arrow(goal)
+                        self.agent.shoot_arrow(goal, list_pit)
                         self.agent.point -= 100
                         self.agent.remove_wumpus(goal, self.room)
                     mode = 1
@@ -214,6 +213,7 @@ class maze():
 
 class Agent():
     def __init__(self):
+        self.arrow = 3
         self.point = 1000
         self.direction = 1  # 1 : north 2: south 3: East 4: west
         self.position = []  # [1,1]
@@ -244,23 +244,29 @@ class Agent():
         path = []
         goal = []
         if len(list_safe) == 0:
-            if 100 - (len(list_wumpus) + len(list_pit) + len(list_safe)) <= 10:
-                list_safe.append(self.cave)
+            if 100 - (len(list_wumpus) + len(list_pit) + len(list_safe)) <= 10 or self.arrow < 1:
+                list_safe.append(cave)
             else:
-                path, goal = self.choose_node(list_wumpus, room)
+                temp = []
+                for i in list_wumpus:
+                    if i not in list_pit:
+                        temp.append(i)
+                path, goal = self.choose_node(temp, room)
                 if len(path) == 0:
-                    list_safe.append(self.cave)
+                    list_safe.append(cave)
                 else:
                     path = path[:len(path) - 1]
                     mode = 22
-        else:
+                    self.arrow -= 1
+        if mode == 21:
             path, goal = self.choose_node(list_safe, room)
         return goal, path, mode
 
-    def shoot_arrow(self, wumpus):
+    def shoot_arrow(self, wumpus, pit):
         room_wumpus = (wumpus[0] - 1) * 10 + wumpus[1]
-        self.KB.tell(aima3.utils.expr(
-            "Safe(" + str(room_wumpus) + ")"))
+        if wumpus not in pit:
+            print('wumpus -> safe: ' + str(wumpus))
+            self.KB.tell(aima3.utils.expr("Safe(" + str(room_wumpus) + ")"))
 
     def first_order_logic(self, room):
         current_room = room[10 - self.position[1]
