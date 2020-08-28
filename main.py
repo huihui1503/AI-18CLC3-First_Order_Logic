@@ -190,6 +190,7 @@ class maze():
                     pygame.quit()
                     exit()
             self.draw_map()
+            print("Point: " + str(self.agent.point))
             if mode != 2:
                 check_stop = self.terminal(list_safe)
             pygame.display.update()
@@ -240,11 +241,13 @@ class Agent():
         self.direction = direction
 
     def take_action(self, list_safe, list_wumpus, list_pit, room, cave):
+        print("Action:", end=" ")
         mode = 21
         path = []
         goal = []
         if len(list_safe) == 0:
             if 100 - (len(list_wumpus) + len(list_pit) + len(list_safe)) <= 10 or self.arrow < 1:
+                print("back to cave", end=" ")
                 list_safe.append(cave)
             else:
                 temp = []
@@ -253,13 +256,16 @@ class Agent():
                         temp.append(i)
                 path, goal = self.choose_node(temp, room)
                 if len(path) == 0:
+                    print("back to cave", end=" ")
                     list_safe.append(cave)
                 else:
+                    print("use arrow to room: " + str(goal))
                     path = path[:len(path) - 1]
                     mode = 22
                     self.arrow -= 1
         if mode == 21:
             path, goal = self.choose_node(list_safe, room)
+            print("find way to room: " + str(goal))
         return goal, path, mode
 
     def shoot_arrow(self, wumpus, pit):
@@ -269,6 +275,7 @@ class Agent():
             self.KB.tell(aima3.utils.expr("Safe(" + str(room_wumpus) + ")"))
 
     def first_order_logic(self, room):
+        print("New knowledge of each room:", end=" ")
         current_room = room[10 - self.position[1]
                             ][self.position[0] - 1]
         temp = current_room.get_adjency_position()
@@ -276,30 +283,39 @@ class Agent():
         if len(current_room.feature) == 0 or 'C' in current_room.feature:
             self.KB.tell(aima3.utils.expr(
                 "Space(" + str(position_agent) + ")"))
+            print("Space(" + str(position_agent) + ")", end=" ")
         else:
             i = 0
             while i < len(current_room.feature):
                 if current_room.feature[i] == 'S':
                     self.KB.tell(aima3.utils.expr(
                         "Stench(" + str(position_agent) + ")"))
+                    print("Stench(" + str(position_agent) + ")", end=" ")
                 if current_room.feature[i] == 'B':
                     self.KB.tell(aima3.utils.expr(
                         "Breeze(" + str(position_agent) + ")"))
+                    print("Breeze(" + str(position_agent) + ")", end=" ")
                 if current_room.feature[i] == 'G':
                     self.point += 100
                     if len(current_room.feature) == 1:
                         self.KB.tell(aima3.utils.expr(
                             "Space(" + str(position_agent) + ")"))
+                        print("Space(" + str(position_agent) + ")", end=" ")
                     current_room.feature.pop(
                         current_room.feature.index('G'))
+                    print("Gold(" + str(position_agent) + ")", end=" ")
                     i -= 1
                 i += 1
         for i in temp:
             if i not in self.discover:
                 self.KB.tell(aima3.utils.expr(
                     "Adjency(" + str(position_agent) + "," + str((i[0] - 1) * 10 + i[1]) + ")"))
+                print("Adjency(" + str(position_agent) + "," +
+                      str((i[0] - 1) * 10 + i[1]) + ")", end=" ")
                 self.KB.tell(aima3.utils.expr(
                     "Adjency(" + str((i[0] - 1) * 10 + i[1]) + "," + str(position_agent) + ")"))
+                print("Adjency(" + str((i[0] - 1) * 10 + i[1]) +
+                      "," + str(position_agent) + ")", end=" ")
         safe = list(aima3.logic.fol_bc_ask(
             self.KB, aima3.utils.expr('Safe(y)')))
         wumpus = list(aima3.logic.fol_bc_ask(
@@ -309,10 +325,12 @@ class Agent():
         safe_list = self.execute_safe_position(safe)
         wumpus_list = None
         pit_list = None
-        if len(safe_list) == 0:
-            wumpus_list = self.execute_wumpus_position(
-                wumpus, safe)
-            pit_list = self.execute_pit_position(pit, safe)
+        wumpus_list = self.execute_wumpus_position(wumpus, safe)
+        pit_list = self.execute_pit_position(pit, safe)
+        print("")
+        print("List of wumpus: " + str(wumpus_list))
+        print("List of pit: " + str(pit_list))
+        print("List of safe: " + str(safe_list))
         return safe_list, wumpus_list, pit_list
 
     def execute_pit_position(self, array_pit, array_safe):
