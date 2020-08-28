@@ -161,16 +161,15 @@ class maze():
         while check_stop:
             clock.tick(10)
             if mode == 1:
-                list_safe, list_wumpus = self.first_order_logic()
-                mode = 2
-            elif mode == 2:
+                list_safe, list_wumpus = self.agent.first_order_logic(
+                    self.room)
                 if len(list_safe) == 0:
                     # calculate whether using arrow or back to cave
                     list_safe.append(self.cave)
-                path, goal = self.choose_node(list_safe)
+                path, goal = self.agent.choose_node(list_safe, self.room)
                 i = 0
-                mode = 3
-            elif mode == 3:
+                mode = 2
+            elif mode == 2:
                 if i < len(path):
                     self.agent.set_direction(self.agent.get_direction(path[i]))
                     self.agent.position = path[i]
@@ -185,7 +184,7 @@ class maze():
                     pygame.quit()
                     exit()
             self.draw_map()
-            if mode != 3:
+            if mode != 2:
                 check_stop = self.terminal(list_safe)
             pygame.display.update()
 
@@ -205,40 +204,78 @@ class maze():
             return False
         return True
 
-    def first_order_logic(self):
-        current_room = self.room[10 - self.agent.position[1]
-                                 ][self.agent.position[0] - 1]
-        temp = current_room.get_adjency()
+    def propositonal_logic(self):
+        g = Glucose3()
+        for it in self.clause:
+            g.add_clause(it)
+        sol = g.solve()
+        if sol:
+            return True, g.get_model()
+        return False, None
+
+
+class Agent():
+    def __init__(self):
+        self.point = 1000
+        self.direction = 1  # 1 : north 2: south 3: East 4: west
+        self.position = []  # [1,1]
+        self.discover = []  # [1,1] [2,2]
+        self.KB = None
+
+    def add_position(self, position):
+        self.position = position
+
+    def compare_ID(self, ID):
+        return self.position[0] == ID[0] and self.position[1] == ID[1]
+
+    def get_direction(self, position):
+        if position[0] - 1 == self.position[0]:
+            return 4
+        if position[0] + 1 == self.position[0]:
+            return 3
+        if position[1] - 1 == self.position[0]:
+            return 2
+        if position[1] + 1 == self.position[0]:
+            return 1
+
+    def set_direction(self, direction):
+        self.direction = direction
+
+    def first_order_logic(self, room):
+        current_room = room[10 - self.position[1]
+                            ][self.position[0] - 1]
+        temp = current_room.get_adjency_position()
         position_agent = current_room.number
         if len(current_room.feature) == 0 or 'C' in current_room.feature:
-            self.agent.KB.tell(aima3.utils.expr(
+            self.KB.tell(aima3.utils.expr(
                 "Space(" + str(position_agent) + ")"))
         else:
             i = 0
             while i < len(current_room.feature):
                 if current_room.feature[i] == 'S':
-                    self.agent.KB.tell(aima3.utils.expr(
+                    self.KB.tell(aima3.utils.expr(
                         "Stench(" + str(position_agent) + ")"))
                 if current_room.feature[i] == 'B':
-                    self.agent.KB.tell(aima3.utils.expr(
+                    self.KB.tell(aima3.utils.expr(
                         "Breeze(" + str(position_agent) + ")"))
                 if current_room.feature[i] == 'G':
-                    self.agent.point += 100
+                    self.point += 100
                     if len(current_room.feature) == 1:
-                        self.agent.KB.tell(aima3.utils.expr(
+                        self.KB.tell(aima3.utils.expr(
                             "Space(" + str(position_agent) + ")"))
                     current_room.feature.pop(current_room.feature.index('G'))
                     i -= 1
                 i += 1
         for i in temp:
-            self.agent.KB.tell(aima3.utils.expr(
-                "Adjency(" + str(position_agent) + "," + str(i) + ")"))
-            self.agent.KB.tell(aima3.utils.expr(
-                "Adjency(" + str(i) + "," + str(position_agent) + ")"))
+            if i not in self.discover:
+                self.KB.tell(aima3.utils.expr(
+                    "Adjency(" + str(position_agent) + "," + str((i[0] - 1) * 10 + i[1]) + ")"))
+                self.KB.tell(aima3.utils.expr(
+                    "Adjency(" + str((i[0] - 1) * 10 + i[1]) + "," + str(position_agent) + ")"))
         safe = list(aima3.logic.fol_bc_ask(
-            self.agent.KB, aima3.utils.expr('Safe(y)')))
+            self.KB, aima3.utils.expr('Safe(y)')))
         wumpus = aima3.logic.fol_bc_ask(
-            self.agent.KB, aima3.utils.expr('Wumpus(x)'))
+            self.KB, aima3.utils.expr('Wumpus(x)'))
         safe_list = self.execute_safe_position(safe)
         wumpus_list = None
         if len(safe_list) == 0:
@@ -273,33 +310,24 @@ class maze():
                 compare_value = [int(value / 10), 10]
             else:
                 compare_value = [int(value / 10) + 1, value % 10]
-            if compare_value not in self.agent.discover and compare_value not in destination:
+            if compare_value not in self.discover and compare_value not in destination:
                 # print([int(value / 10) + 1, value % 10])
                 destination.append(compare_value)
         return destination
 
-    def propositonal_logic(self):
-        g = Glucose3()
-        for it in self.clause:
-            g.add_clause(it)
-        sol = g.solve()
-        if sol:
-            return True, g.get_model()
-        return False, None
-
-    def choose_node(self, list_safe):
+    def choose_node(self, list_safe, room):
         min_cost = 9999
         path = None
         goal = None
         for i in list_safe:
-            temp = self.BFS(i)
+            temp = self.BFS(i, room)
             if len(temp) < min_cost:
                 min_cost = len(temp)
                 path = temp
                 goal = i
         return path, goal
 
-    def BFS(self, goal):
+    def BFS(self, goal, room):
         return_value = []
         check_stop = True
         frontier_parent = []
@@ -307,7 +335,7 @@ class maze():
         frontier = []
         expanded = []
         frontier.append(
-            (self.agent.position[0] - 1) * 10 + self.agent.position[1])
+            (self.position[0] - 1) * 10 + self.position[1])
         frontier_parent.append(-1)
         while check_stop:
             if len(frontier) == 0:
@@ -315,11 +343,11 @@ class maze():
             expanded.append(frontier[0])
             expanded_parent.append(frontier_parent[0])
             if frontier[0] % 10 == 0:
-                adjacency_node = self.room[0][int(
+                adjacency_node = room[0][int(
                     frontier[0] / 10) - 1].get_adjency()
             else:
-                adjacency_node = self.room[10 - (frontier[0] % 10)
-                                           ][int(frontier[0] / 10)].get_adjency()
+                adjacency_node = room[10 - (frontier[0] % 10)
+                                      ][int(frontier[0] / 10)].get_adjency()
             frontier_parent = frontier_parent[1:]
             frontier = frontier[1:]
 
@@ -340,7 +368,7 @@ class maze():
                         return_value = return_value[:: -1]
                         return_value = return_value[1:]
                         check_stop = False
-                    elif temp_value in self.agent.discover:
+                    elif temp_value in self.discover:
                         if not i in frontier:
                             frontier_parent.append(len(expanded) - 1)
                             frontier.append(i)
@@ -351,34 +379,6 @@ class maze():
             else:
                 path.append([int(i / 10) + 1, i % 10])
         return path
-
-
-class Agent():
-    def __init__(self):
-        self.point = 1000
-        self.direction = 1  # 1 : north 2: south 3: East 4: west
-        self.position = []  # [1,1]
-        self.discover = []  # [1,1] [2,2]
-        self.KB = None
-
-    def add_position(self, position):
-        self.position = position
-
-    def compare_ID(self, ID):
-        return self.position[0] == ID[0] and self.position[1] == ID[1]
-
-    def get_direction(self, position):
-        if position[0] - 1 == self.position[0]:
-            return 4
-        if position[0] + 1 == self.position[0]:
-            return 3
-        if position[1] - 1 == self.position[0]:
-            return 2
-        if position[1] + 1 == self.position[0]:
-            return 1
-
-    def set_direction(self, direction):
-        self.direction = direction
 
 
 class Room():
