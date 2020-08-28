@@ -164,12 +164,9 @@ class maze():
             clock.tick(10)
             if mode == 1:
                 list_safe, list_wumpus, list_pit = self.agent.first_order_logic(
-                    self.room) 
-                goal, path, action = self.agent.take_action(list_safe, list_wumpus, list_pit, self.room, self.cave)
-                print("Wumpus list:")
-                print(list_wumpus)
-                print("Safe list:")
-                print(list_safe)
+                    self.room)
+                goal, path, action = self.agent.take_action(
+                    list_safe, list_wumpus, list_pit, self.room, self.cave)
                 i = 0
                 mode = 2
             elif mode == 2:
@@ -179,14 +176,15 @@ class maze():
                     self.agent.point -= 10
                     i += 1
                 else:
-                    if action == 21: #Go to safe
+                    if action == 21:  # Go to safe
                         self.agent.discover.append(goal)
                         self.room[10 - goal[1]][goal[0] - 1].discover = False
-                    elif action == 22: #Shoot
-                        self.agent.set_direction(self.agent.get_direction(goal)) #Face to wumpus
+                    elif action == 22:  # Shoot
+                        self.agent.set_direction(
+                            self.agent.get_direction(goal))  # Face to wumpus
                         self.agent.shoot_arrow(goal)
                         self.agent.point -= 100
-                        self.remove_wumpus(goal)
+                        self.agent.remove_wumpus(goal, self.room)
                     mode = 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -196,29 +194,7 @@ class maze():
             if mode != 2:
                 check_stop = self.terminal(list_safe)
             pygame.display.update()
-            
-    def remove_wumpus(self, wumpus):
-        print("Wumpus:")
-        print(wumpus)
-        wumpus_room = self.room[10 - wumpus[1]][wumpus[0] - 1]
-        if 'W' in wumpus_room.feature: #If has wumpus => remove
-            wumpus_room.feature.pop(wumpus_room.feature.index('W'))
-            adjency_wumpus_room = wumpus_room.get_adjency_position()
-        
-            for a1 in adjency_wumpus_room:
-                pos_room = self.room[10 - a1[1]][a1[0] - 1]
-                adjency_room =  pos_room.get_adjency_position()
-                check = False
-                for a2 in adjency_room:
-                    if 'W' in a2.feature:
-                        check = True
-                        break
-                if check == False:
-                    pos_room.feature.pop(pos_room.feature.index('S'))
-        else:
-            return None
-       
-                
+
     def terminal(self, list_safe):
         current_room = self.room[10 - self.agent.position[1]
                                  ][self.agent.position[0] - 1]
@@ -234,6 +210,7 @@ class maze():
             print('C')
             return False
         return True
+
 
 class Agent():
     def __init__(self):
@@ -261,30 +238,30 @@ class Agent():
 
     def set_direction(self, direction):
         self.direction = direction
-        
+
     def take_action(self, list_safe, list_wumpus, list_pit, room, cave):
-        check = True
-        mode = None
+        mode = 21
+        path = []
+        goal = []
         if len(list_safe) == 0:
-            if 100 - (len(list_wumpus ) + len(list_pit) + len(list_safe)) <= 10:
+            if 100 - (len(list_wumpus) + len(list_pit) + len(list_safe)) <= 10:
                 list_safe.append(self.cave)
             else:
-                check = False
-        if check == True:
-            path, goal = self.choose_node(list_safe, room)
-            mode = 21
+                path, goal = self.choose_node(list_wumpus, room)
+                if len(path) == 0:
+                    list_safe.append(self.cave)
+                else:
+                    path = path[:len(path) - 1]
+                    mode = 22
         else:
-            path, goal = self.choose_node(list_wumpus, room)
-            path = path[:len(path) - 1]
-            mode = 22 
-        
+            path, goal = self.choose_node(list_safe, room)
         return goal, path, mode
-    
+
     def shoot_arrow(self, wumpus):
         room_wumpus = (wumpus[0] - 1) * 10 + wumpus[1]
         self.KB.tell(aima3.utils.expr(
-                        "Safe(" + str(room_wumpus) + ")"))
-           
+            "Safe(" + str(room_wumpus) + ")"))
+
     def first_order_logic(self, room):
         current_room = room[10 - self.position[1]
                             ][self.position[0] - 1]
@@ -307,7 +284,8 @@ class Agent():
                     if len(current_room.feature) == 1:
                         self.KB.tell(aima3.utils.expr(
                             "Space(" + str(position_agent) + ")"))
-                    current_room.feature.pop(current_room.feature.index('G'))
+                    current_room.feature.pop(
+                        current_room.feature.index('G'))
                     i -= 1
                 i += 1
         for i in temp:
@@ -318,18 +296,19 @@ class Agent():
                     "Adjency(" + str((i[0] - 1) * 10 + i[1]) + "," + str(position_agent) + ")"))
         safe = list(aima3.logic.fol_bc_ask(
             self.KB, aima3.utils.expr('Safe(y)')))
-        wumpus = aima3.logic.fol_bc_ask(
-            self.KB, aima3.utils.expr('Wumpus(x)'))
-        pit = aima3.logic.fol_bc_ask(
-            self.KB, aima3.utils.expr('Pit(x)'))
+        wumpus = list(aima3.logic.fol_bc_ask(
+            self.KB, aima3.utils.expr('Wumpus(x)')))
+        pit = list(aima3.logic.fol_bc_ask(
+            self.KB, aima3.utils.expr('Pit(x)')))
         safe_list = self.execute_safe_position(safe)
         wumpus_list = None
         pit_list = None
         if len(safe_list) == 0:
-            wumpus_list = self.execute_wumpus_position(list(wumpus), list(safe))
-            pit_list = self.execute_pit_position(list(pit), list(safe))
+            wumpus_list = self.execute_wumpus_position(
+                wumpus, safe)
+            pit_list = self.execute_pit_position(pit, safe)
         return safe_list, wumpus_list, pit_list
-    
+
     def execute_pit_position(self, array_pit, array_safe):
         pit = []
         for i in array_pit:
@@ -339,7 +318,7 @@ class Agent():
                     check = False
                     break
             if check:
-                if i[aima3.utils.expr('x')] % 10:
+                if i[aima3.utils.expr('x')] % 10 == 0:
                     value = [int(i[aima3.utils.expr('x')] / 10), 10]
                 else:
                     value = [int(i[aima3.utils.expr('x')] / 10) +
@@ -357,7 +336,7 @@ class Agent():
                     check = False
                     break
             if check:
-                if i[aima3.utils.expr('x')] % 10:
+                if i[aima3.utils.expr('x')] % 10 == 0:
                     value = [int(i[aima3.utils.expr('x')] / 10), 10]
                 else:
                     value = [int(i[aima3.utils.expr('x')] / 10) +
@@ -380,13 +359,33 @@ class Agent():
                 destination.append(compare_value)
         return destination
 
+    def remove_wumpus(self, wumpus, room):
+        wumpus_room = room[10 - wumpus[1]][wumpus[0] - 1]
+        if 'W' in wumpus_room.feature:  # If has wumpus => remove
+            wumpus_room.feature.pop(wumpus_room.feature.index('W'))
+            adjency_wumpus_room = wumpus_room.get_adjency_position()
+
+            for a1 in adjency_wumpus_room:
+                pos_room = room[10 - a1[1]][a1[0] - 1]
+                adjency_room = pos_room.get_adjency_position()
+                check = False
+                for a2 in adjency_room:
+                    if 'W' in room[10 - a2[1]][a2[0] - 1].feature:
+                        check = True
+                        break
+                if check == False:
+                    pos_room.feature.pop(pos_room.feature.index('S'))
+                    if not pos_room.discover and len(pos_room.feature) == 0:
+                        self.KB.tell(aima3.utils.expr(
+                            "Space(" + str(pos_room.number) + ")"))
+
     def choose_node(self, list_safe, room):
         min_cost = 9999
-        path = None
-        goal = None
+        path = []
+        goal = []
         for i in list_safe:
             temp = self.BFS(i, room)
-            if len(temp) < min_cost:
+            if len(temp) < min_cost and len(temp) != 0:
                 min_cost = len(temp)
                 path = temp
                 goal = i
@@ -444,6 +443,7 @@ class Agent():
             else:
                 path.append([int(i / 10) + 1, i % 10])
         return path
+
 
 class Room():
     def __init__(self, ID, feature):
